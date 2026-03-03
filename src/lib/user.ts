@@ -2,6 +2,7 @@ import { db } from "./firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { User as FirebaseUser } from "firebase/auth";
 import { onSnapshot } from "firebase/firestore";
+import { updateDoc } from "firebase/firestore";
 
 export async function syncUserToFirestore(user: FirebaseUser) {
   const userRef = doc(db, "users", user.uid);
@@ -59,5 +60,32 @@ export function subscribeUserStats(
       // データの存在を確認し、型をキャスト
       callback(docSnap.data() as UserData);
     }
+  });
+}
+
+// ユーザー設定を更新する
+export async function updateUserSettings(
+  uid: string,
+  settings: { bgm: string },
+) {
+  const userRef = doc(db, "users", uid);
+  await updateDoc(userRef, {
+    settings: settings,
+  });
+}
+
+// ユーザー名を変更する
+export async function updateDisplayName(uid: string, name: string) {
+  const userRef = doc(db, "users", uid);
+  await updateDoc(userRef, {
+    displayName: name,
+  });
+}
+
+// 戦績をリセットする
+export async function resetUserStats(uid: string) {
+  const userRef = doc(db, "users", uid);
+  await updateDoc(userRef, {
+    stats: { wins: 0, losses: 0, rating: 1500 },
   });
 }

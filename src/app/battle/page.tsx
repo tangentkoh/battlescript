@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Editor from "@monaco-editor/react";
-import { Terminal, Send, Play, Cpu, Globe } from "lucide-react";
+import { Terminal, Send, Play, /*Cpu,*/ Globe } from "lucide-react"; // 一時無効
 
 export default function BattlePage() {
   const [code, setCode] = useState<string | undefined>(
