@@ -2,7 +2,7 @@ import { db } from "./firebase";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { User as FirebaseUser } from "firebase/auth";
 import { onSnapshot } from "firebase/firestore";
-import { updateDoc } from "firebase/firestore";
+import { updateDoc, increment } from "firebase/firestore";
 
 export async function syncUserToFirestore(user: FirebaseUser) {
   const userRef = doc(db, "users", user.uid);
@@ -88,4 +88,27 @@ export async function resetUserStats(uid: string) {
   await updateDoc(userRef, {
     stats: { wins: 0, losses: 0, rating: 1000 },
   });
+}
+
+// レーティング
+export async function updateBattleResult(
+  uid: string,
+  isWin: boolean,
+  isCpuBattle: boolean,
+) {
+  const userRef = doc(db, "users", uid);
+
+  if (isCpuBattle) {
+    // 対CPU：勝てば+1、負ければ-1
+    await updateDoc(userRef, {
+      "stats.rating": increment(isWin ? 1 : -1),
+    });
+  } else {
+    // 対人：勝ち負けのカウント
+    await updateDoc(userRef, {
+      "stats.wins": isWin ? increment(1) : increment(0),
+      "stats.losses": isWin ? increment(0) : increment(1),
+      "stats.rating": increment(isWin ? 10 : -10),
+    });
+  }
 }

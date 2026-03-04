@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Editor from "@monaco-editor/react";
-import { /*Terminal,*/ Send, Play, Globe, Cpu, Loader2 } from "lucide-react"; // 一時無効
+import { Send, Play, Globe, Cpu, Loader2 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { generateProblem, Problem, judgeCode } from "@/lib/gemini";
+import { updateBattleResult, subscribeUserStats, UserData } from "@/lib/user"; // 修正
+import { auth } from "@/lib/firebase"; // authはfirebase.tsから
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function BattlePage() {
   const searchParams = useSearchParams();
@@ -17,6 +20,7 @@ export default function BattlePage() {
 
   const [problem, setProblem] = useState<Problem | null>(null);
   const [code, setCode] = useState<string>("");
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [consoleLog, setConsoleLog] = useState<string[]>([
     "[SYSTEM]: Awaiting initialization...",
@@ -26,6 +30,12 @@ export default function BattlePage() {
   const [cpuProgress, setCpuProgress] = useState(0);
   const [battleActive, setBattleActive] = useState(false);
 
+  // 最新の値を副作用なしで参照するためのRef
+  const userDataRef = useRef<UserData | null>(null);
+  useEffect(() => {
+    userDataRef.current = userData;
+  }, [userData]);
+
   const addLog = useCallback((msg: string) => {
     setConsoleLog((prev) => [
       ...prev,
@@ -33,23 +43,54 @@ export default function BattlePage() {
     ]);
   }, []);
 
-  const handleBattleEnd = useCallback(
-    (result: "PLAYER_WIN" | "CPU_WIN") => {
-      setBattleActive(false);
-      if (result === "PLAYER_WIN") {
-        addLog("≫ [SUCCESS]: PLAYER_AC_COMPLETED. YOU WIN!");
-        alert("勝利しました！");
+  // ログイン状態とユーザーデータの購読
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) {
+        router.push("/");
       } else {
-        addLog("≫ [FAILED]: CPU_AC_FIRST. YOU LOSE...");
-        alert("CPUが先に正解しました。敗北です。");
+        const unsubscribeStats = subscribeUserStats(currentUser.uid, (data) => {
+          setUserData(data);
+        });
+        return () => unsubscribeStats();
       }
+    });
+    return () => unsubscribeAuth();
+  }, [router]);
+
+  const handleBattleEnd = useCallback(
+    async (result: "PLAYER_WIN" | "CPU_WIN") => {
+      setBattleActive(false);
+      const isWin = result === "PLAYER_WIN";
+      const currentUserId = userDataRef.current?.uid;
+
+      if (currentUserId) {
+        await updateBattleResult(currentUserId, isWin, mode === "cpu");
+      }
+
+      if (isWin) {
+        alert("MISSION_COMPLETE: RATING +1");
+      } else {
+        alert("MISSION_FAILED: RATING -1");
+      }
+
       router.push("/home");
     },
-    [addLog, router],
+    [router, mode], // addLogとuserDataを除去
   );
 
+  const handleRetire = () => {
+    if (
+      confirm(
+        "SYSTEM_WARNING: 離脱すると敗北として処理されます。続行しますか？",
+      )
+    ) {
+      handleBattleEnd("CPU_WIN");
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true; // 重複実行防止フラグ
+    let isMounted = true;
 
     async function initBattle() {
       try {
@@ -60,6 +101,7 @@ export default function BattlePage() {
           setProblem(newProblem);
           setBattleActive(true);
           setCoolDown(30);
+          // addLogは依存配列に含まれているため直接呼んでOK
           addLog(`[SYSTEM]: Mode initialized as ${mode}`);
           addLog(`[SYSTEM]: Problem loaded. Battle start!`);
         }
@@ -73,7 +115,7 @@ export default function BattlePage() {
     initBattle();
     return () => {
       isMounted = false;
-    }; // クリーンアップ
+    };
   }, [difficulty, mode, addLog]);
 
   useEffect(() => {
@@ -125,12 +167,13 @@ export default function BattlePage() {
 
   return (
     <div className="flex flex-col h-screen bg-[#0d1117] text-[#adbac7] font-mono overflow-hidden">
+      {/* 以前のJSX部分をそのまま維持 */}
       <header className="h-14 border-b border-[#30363d] flex items-center justify-between px-6 bg-[#161b22]">
         <div className="flex items-center gap-4">
           <button
             type="button"
-            title="Exit Battle"
-            onClick={() => router.push("/home")}
+            title="Retire from Battle"
+            onClick={handleRetire}
             className="text-[#00ff41] hover:underline text-xs"
           >
             ≪ EXIT
@@ -138,7 +181,7 @@ export default function BattlePage() {
           <div className="flex items-center gap-2 bg-black/30 px-3 py-1 rounded border border-[#30363d] text-[10px]">
             {mode === "cpu" ? <Cpu size={12} /> : <Globe size={12} />}
             <span>
-              {mode.toUpperCase()} {/* */} {language.toUpperCase()} {/*  */}{" "}
+              {mode.toUpperCase()} {/* */} {language.toUpperCase()} {/* */}
               {difficulty.toUpperCase()}
             </span>
           </div>
@@ -152,7 +195,7 @@ export default function BattlePage() {
             <div className="h-1.5 w-32 bg-gray-800 rounded-full mt-1 overflow-hidden border border-white/5">
               <div
                 className="h-full bg-red-500 transition-all duration-1000 ease-linear"
-                style={{ width: `${cpuProgress}%` }}
+                style={{ width: `${cpuProgress}%` } as React.CSSProperties}
               />
             </div>
           </div>
@@ -167,19 +210,17 @@ export default function BattlePage() {
             </h2>
             <div className="space-y-4 text-sm leading-relaxed">
               <p className="whitespace-pre-wrap">{problem?.description}</p>
-
               <div className="bg-black/40 p-3 rounded border border-[#30363d]">
-                <p className="text-[10px] opacity-50 mb-1 font-bold">
-                  SAMPLE_INPUT
+                <p className="text-[10px] opacity-50 mb-1 font-bold uppercase">
+                  Sample Input
                 </p>
                 <code className="text-white text-xs">
                   {problem?.sample_input}
                 </code>
               </div>
-
               <div className="bg-black/40 p-3 rounded border border-[#30363d]">
-                <p className="text-[10px] opacity-50 mb-1 font-bold">
-                  SAMPLE_OUTPUT
+                <p className="text-[10px] opacity-50 mb-1 font-bold uppercase">
+                  Sample Output
                 </p>
                 <code className="text-white text-xs">
                   {problem?.sample_output}
@@ -187,7 +228,6 @@ export default function BattlePage() {
               </div>
             </div>
           </div>
-
           <div className="h-1/3 p-4 bg-black/60 font-mono text-[10px] overflow-y-auto text-gray-500">
             {consoleLog.map((log, i) => (
               <p key={i}>{log}</p>
@@ -208,7 +248,6 @@ export default function BattlePage() {
               fontFamily: "JetBrains Mono",
             }}
           />
-
           <div className="absolute bottom-6 right-8 flex flex-col items-end gap-3">
             {coolDown > 0 && (
               <div className="text-[10px] text-orange-500 animate-pulse font-bold bg-black/80 px-3 py-1 border border-orange-500/50 rounded shadow-lg">
