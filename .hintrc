@@ -1,0 +1,7 @@
+// 警告の非表示
+{
+  "extends": ["development"],
+  "hints": {
+    "no-inline-styles": "off",
+  },
+}
