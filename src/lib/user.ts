@@ -18,7 +18,7 @@ export async function syncUserToFirestore(user: FirebaseUser) {
       stats: {
         wins: 0,
         losses: 0,
-        rating: 1500,
+        rating: 1000,
       },
       settings: {
         bgm: "none",
@@ -86,6 +86,6 @@ export async function updateDisplayName(uid: string, name: string) {
 export async function resetUserStats(uid: string) {
   const userRef = doc(db, "users", uid);
   await updateDoc(userRef, {
-    stats: { wins: 0, losses: 0, rating: 1500 },
+    stats: { wins: 0, losses: 0, rating: 1000 },
   });
 }

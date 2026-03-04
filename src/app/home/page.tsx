@@ -92,7 +92,7 @@ export default function HomePage() {
 
         <MenuCard
           title="CPU_BATTLE"
-          desc="練習モード。自分に最適な難易度のAIと戦う。"
+          desc="練習モード。自分に最適な難易度のCPUと戦う。"
           icon={<Cpu className="w-10 h-10" />}
           color="border-[#00ff41]/50 hover:bg-[#00ff41]/10 hover:border-[#00ff41]"
           onClick={() => router.push("/battle?mode=cpu")}
@@ -100,7 +100,7 @@ export default function HomePage() {
 
         <MenuCard
           title="SETTINGS"
-          desc="戦績の確認、BGMの選択、プロフィールの編集。"
+          desc="戦績の確認、BGMの選択、プロフィールの編集など。"
           icon={<Settings className="w-10 h-10" />}
           color="border-purple-500/50 hover:bg-purple-500/10 hover:border-purple-400"
           onClick={() => router.push("/settings")}
@@ -131,14 +131,14 @@ export default function HomePage() {
 
         <div className="mt-6 p-4 bg-[#161b22] border border-[#30363d] rounded text-[10px] opacity-60 uppercase tracking-[0.2em] flex justify-between">
           <p className="animate-pulse">≫ SYSTEM_READY: Connection stable.</p>
-          <p>Location: Gifu, Japan</p>
+          <p>Location: Fault</p>
         </div>
       </div>
     </div>
   );
 }
 
-// サブコンポーネント
+// サブコンポーネント1
 function StatBox({
   label,
   value,
@@ -160,7 +160,7 @@ function StatBox({
   );
 }
 
-// サブコンポーネント
+// サブコンポーネント2
 interface MenuCardProps {
   title: string;
   desc: string;
