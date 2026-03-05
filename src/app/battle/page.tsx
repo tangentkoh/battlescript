@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Editor from "@monaco-editor/react";
-import { Send, Play, Globe, Cpu, Loader2 } from "lucide-react";
+import { Send, /*Play,*/ Globe, Cpu, Loader2 } from "lucide-react"; // TEST機能と共に無効か
 import { useSearchParams, useRouter } from "next/navigation";
 import { generateProblem, Problem, judgeCode } from "@/lib/gemini";
-import { updateBattleResult, subscribeUserStats, UserData } from "@/lib/user"; // 修正
-import { auth } from "@/lib/firebase"; // authはfirebase.tsから
+import { updateBattleResult, subscribeUserStats, UserData } from "@/lib/user";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 export default function BattlePage() {
@@ -30,7 +30,12 @@ export default function BattlePage() {
   const [cpuProgress, setCpuProgress] = useState(0);
   const [battleActive, setBattleActive] = useState(false);
 
-  // 最新の値を副作用なしで参照するためのRef
+  const [showResult, setShowResult] = useState(false);
+  const [battleResult, setBattleResult] = useState<
+    "PLAYER_WIN" | "CPU_WIN" | null
+  >(null);
+
+  // 最新の値を参照する
   const userDataRef = useRef<UserData | null>(null);
   useEffect(() => {
     userDataRef.current = userData;
@@ -43,7 +48,7 @@ export default function BattlePage() {
     ]);
   }, []);
 
-  // ログイン状態とユーザーデータの購読
+  // ログイン状態とユーザーデータ
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
@@ -61,22 +66,17 @@ export default function BattlePage() {
   const handleBattleEnd = useCallback(
     async (result: "PLAYER_WIN" | "CPU_WIN") => {
       setBattleActive(false);
+      setBattleResult(result);
+      setShowResult(true); // リザルト画面
+
       const isWin = result === "PLAYER_WIN";
       const currentUserId = userDataRef.current?.uid;
 
       if (currentUserId) {
         await updateBattleResult(currentUserId, isWin, mode === "cpu");
       }
-
-      if (isWin) {
-        alert("MISSION_COMPLETE: RATING +1");
-      } else {
-        alert("MISSION_FAILED: RATING -1");
-      }
-
-      router.push("/home");
     },
-    [router, mode], // addLogとuserDataを除去
+    [mode],
   );
 
   const handleRetire = () => {
@@ -101,7 +101,6 @@ export default function BattlePage() {
           setProblem(newProblem);
           setBattleActive(true);
           setCoolDown(30);
-          // addLogは依存配列に含まれているため直接呼んでOK
           addLog(`[SYSTEM]: Mode initialized as ${mode}`);
           addLog(`[SYSTEM]: Problem loaded. Battle start!`);
         }
@@ -129,7 +128,7 @@ export default function BattlePage() {
     if (battleActive && !loading) {
       const interval = setInterval(() => {
         setCpuProgress((prev) => {
-          const increment = difficulty === "easy" ? 0.5 : 1.0;
+          const increment = difficulty === "easy" ? 0.4 : 0.2;
           if (prev >= 100) {
             handleBattleEnd("CPU_WIN");
             return 100;
@@ -255,6 +254,7 @@ export default function BattlePage() {
               </div>
             )}
             <div className="flex gap-4">
+              {/*
               <button
                 type="button"
                 title="Run Tests"
@@ -263,6 +263,8 @@ export default function BattlePage() {
                 <Play size={18} />
                 <span className="text-xs font-bold">RUN_TEST</span>
               </button>
+              */}
+
               <button
                 type="button"
                 title="Submit Code"
@@ -287,6 +289,65 @@ export default function BattlePage() {
           </div>
         </div>
       </main>
+
+      {showResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md transition-all duration-700">
+          <div
+            className={`p-10 border-2 rounded-lg text-center max-w-lg w-full shadow-[0_0_50px_rgba(0,0,0,0.5)] ${
+              battleResult === "PLAYER_WIN"
+                ? "border-[#00ff41] shadow-[#00ff41]/20"
+                : "border-red-500 shadow-red-500/20"
+            }`}
+          >
+            <h2
+              className={`text-5xl font-black italic tracking-tighter mb-2 ${
+                battleResult === "PLAYER_WIN"
+                  ? "text-[#00ff41] animate-pulse"
+                  : "text-red-500"
+              }`}
+            >
+              {battleResult === "PLAYER_WIN" ? "BATTLE_WIN" : "BATTLE_LOSE"}
+            </h2>
+
+            <p className="text-[10px] opacity-60 mb-8 tracking-[0.5em] uppercase">
+              {battleResult === "PLAYER_WIN"
+                ? "Mission Objective: Completed"
+                : "Mission Objective: Failed"}
+            </p>
+
+            <div className="bg-black/50 border border-[#30363d] p-6 rounded mb-8">
+              <div className="text-[10px] text-gray-500 mb-1 uppercase">
+                Rating_Adjustment
+              </div>
+              <div className="flex items-center justify-center gap-4">
+                {/* 現在のレート */}
+                <span className="text-2xl text-gray-400 font-bold">
+                  {userData?.stats.rating}
+                </span>
+                <span className="text-xl text-gray-600">←←←</span>
+                {/* 更新後のレートを計算して表示 */}
+                <span
+                  className={`text-4xl font-black ${battleResult === "PLAYER_WIN" ? "text-[#00ff41]" : "text-red-500"}`}
+                >
+                  {battleResult === "PLAYER_WIN" ? 1 : -1}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => router.push("/home")}
+              className={`w-full py-4 font-black tracking-[0.2em] transition-all active:scale-95 ${
+                battleResult === "PLAYER_WIN"
+                  ? "bg-[#00ff41] text-black hover:bg-green-400"
+                  : "bg-red-600 text-white hover:bg-red-500"
+              }`}
+            >
+              RETURN_TO_BASE
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

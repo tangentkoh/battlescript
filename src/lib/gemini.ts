@@ -19,7 +19,9 @@ export async function generateProblem(
   difficulty: "easy" | "medium" | "hard",
 ): Promise<Problem> {
   // モデル名の指定に 'models/' を付与（404エラー対策）
-  const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({
+    model: "gemini-3-flash-preview",
+  });
 
   const prompt = `
     あなたは競技プログラミングの問題作成者です。
@@ -62,7 +64,9 @@ export async function judgeCode(
   code: string,
   language: string,
 ): Promise<{ isCorrect: boolean; feedback: string }> {
-  const model = genAI.getGenerativeModel({ model: "models/gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({
+    model: "gemini-3-flash-preview",
+  });
 
   const prompt = `
     あなたは競技プログラミングのジャッジシステムです。
@@ -94,3 +98,6 @@ export async function judgeCode(
     .trim();
   return JSON.parse(cleanJson);
 }
+
+// curl "https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyBmQceJ3OIDCuOrFyvGM2gNqbw8Ym72pio"
+// モデルの一覧
