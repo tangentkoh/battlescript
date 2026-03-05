@@ -1,50 +1,52 @@
-// src/lib/matchmaking.ts
 import { rtdb } from "./firebase";
 import {
   ref,
   onValue,
-  /*push,*/
   set,
   remove,
   update,
   get,
   serverTimestamp,
   off,
+  onDisconnect,
 } from "firebase/database";
 
+// マッチングとリアルタイム同期
+export interface PlayerSyncData {
+  name: string;
+  progress: number;
+  isFinished: boolean;
+}
+
+// マッチング開始
 export async function startMatching(
   uid: string,
   name: string,
   rating: number,
-  config: { lang: string; diff: string },
   onMatchFound: (roomId: string) => void,
 ) {
   const poolRef = ref(rtdb, "matching_pool");
   const userInPoolRef = ref(rtdb, `matching_pool/${uid}`);
 
-  // 1. 待機中のプレイヤーを確認
   const snapshot = await get(poolRef);
   const pool = snapshot.val();
 
   let opponentId = "";
   if (pool) {
-    // 自分以外の最初に見つかったユーザーを相手にする
     opponentId = Object.keys(pool).find((id) => id !== uid) || "";
   }
 
   if (opponentId) {
-    // 【マッチ成立！】
+    // マッチング
     const opponent = pool[opponentId];
-    const roomId = `room_${uid}_${opponentId}`; // ユニークなルームID
+    const roomId = `room_${uid}_${opponentId}`;
     const roomRef = ref(rtdb, `rooms/${roomId}`);
 
-    // ルームを作成し、待機列から相手を削除
     await set(roomRef, {
-      status: "waiting",
-      difficulty: "medium", // とりあえず固定
+      status: "playing",
       players: {
-        [uid]: { name, progress: 0, isReady: true },
-        [opponentId]: { name: opponent.name, progress: 0, isReady: true },
+        [uid]: { name, progress: 0, isFinished: false },
+        [opponentId]: { name: opponent.name, progress: 0, isFinished: false },
       },
       createdAt: serverTimestamp(),
     });
@@ -52,23 +54,20 @@ export async function startMatching(
     await remove(ref(rtdb, `matching_pool/${opponentId}`));
     onMatchFound(roomId);
   } else {
-    // 【自分が待機列に並ぶ】
-    await set(userInPoolRef, {
-      name,
-      rating,
-      joinedAt: serverTimestamp(),
-    });
+    // 待機
+    await set(userInPoolRef, { name, rating, joinedAt: serverTimestamp() });
 
-    // 誰かが自分を拾ってルームを作ってくれるのを監視
+    // 待機中にブラウザを閉じたら削除
+    onDisconnect(userInPoolRef).remove();
+
     const roomsRef = ref(rtdb, "rooms");
     const unsubscribe = onValue(roomsRef, (snapshot) => {
       const rooms = snapshot.val();
       if (rooms) {
-        // 自分が含まれているルームを探す
         const matchedRoomId = Object.keys(rooms).find((id) => id.includes(uid));
         if (matchedRoomId) {
           unsubscribe();
-          remove(userInPoolRef); // 待機列から削除
+          remove(userInPoolRef);
           onMatchFound(matchedRoomId);
         }
       }
@@ -76,20 +75,19 @@ export async function startMatching(
   }
 }
 
-export interface PlayerSyncData {
-  name: string;
-  progress: number;
-  isFinished: boolean; // 勝利判定用
+// マッチングキャンセル
+export async function cancelMatching(uid: string) {
+  await remove(ref(rtdb, `matching_pool/${uid}`));
 }
 
-// 自分の進捗を送信する
+// 進捗更新
 export function updateProgress(roomId: string, uid: string, progress: number) {
-  const updates: Record<string, number> = {}; // 型指定
+  const updates: Record<string, number> = {};
   updates[`rooms/${roomId}/players/${uid}/progress`] = progress;
   update(ref(rtdb), updates);
 }
 
-// 勝利を報告する
+// 勝利報告
 export function reportVictory(roomId: string, uid: string) {
   const updates: Record<string, boolean | string> = {};
   updates[`rooms/${roomId}/players/${uid}/isFinished`] = true;
@@ -97,7 +95,7 @@ export function reportVictory(roomId: string, uid: string) {
   update(ref(rtdb), updates);
 }
 
-// 相手の進捗を監視する
+// 敗北報告
 export function subscribeOpponent(
   roomId: string,
   opponentId: string,
@@ -108,4 +106,10 @@ export function subscribeOpponent(
     callback(snapshot.val() as PlayerSyncData | null);
   });
   return () => off(opponentRef);
+}
+
+// 切断による敗北設定
+export function setupDisconnectDefeat(roomId: string, uid: string) {
+  const playerRef = ref(rtdb, `rooms/${roomId}/players/${uid}/isFinished`);
+  onDisconnect(playerRef).set(true);
 }

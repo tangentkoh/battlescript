@@ -16,14 +16,9 @@ export default function LoginPage() {
 
       if (result.user) {
         console.log("Auth success, syncing with Firestore...");
-        // Firestoreへの保存が終わるのを確実に待つ
         await syncUserToFirestore(result.user);
-
         console.log("Sync success, redirecting to /home...");
-        // 遷移を実行
         router.push("/home");
-
-        // 念のため、App Routerのキャッシュをリフレッシュ（遷移を確実にするため）
         router.refresh();
       }
     } catch (error) {

@@ -4,7 +4,7 @@ import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { subscribeUserStats, UserData } from "@/lib/user";
-import { startMatching } from "@/lib/matchmaking";
+import { startMatching, cancelMatching } from "@/lib/matchmaking";
 import {
   Globe,
   Cpu,
@@ -27,12 +27,14 @@ export default function HomePage() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
 
+  // マッチング待機中かどうかのフラグ
+  const [isMatching, setIsMatching] = useState(false);
+
   const [logs, setLogs] = useState<string[]>(["≫ SYSTEM_INITIALIZED"]);
   const addLog = useCallback((msg: string) => {
-    setLogs((prev) => [...prev.slice(-4), msg]); // 直近5件のみ保持
+    setLogs((prev) => [...prev.slice(-4), msg]);
   }, []);
 
-  // モーダル管理用のステート
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState({
     lang: "cpp",
@@ -55,9 +57,44 @@ export default function HomePage() {
     return () => unsubscribeAuth();
   }, [router]);
 
+  // タブを閉じたり、画面遷移した時に待機状態ならキャンセルする
+  useEffect(() => {
+    return () => {
+      if (isMatching && user) {
+        cancelMatching(user.uid);
+      }
+    };
+  }, [isMatching, user]);
+
   const handleLogout = async () => {
     await signOut(auth);
     router.push("/");
+  };
+
+  // オンライン対戦ボタンのハンドラ
+  const handleOnlineBattleClick = async () => {
+    if (!userData) return;
+
+    if (isMatching) {
+      // 待機中ならキャンセル
+      await cancelMatching(userData.uid);
+      setIsMatching(false);
+      addLog("≫ MATCHMAKING_ABORTED_BY_USER.");
+    } else {
+      // 待機開始
+      setIsMatching(true);
+      addLog("≫ INITIALIZING_MATCHMAKING_PROTOCOL...");
+      startMatching(
+        userData.uid,
+        userData.displayName || "GUEST_USER",
+        userData.stats.rating,
+        (roomId: string) => {
+          setIsMatching(false);
+          addLog(`≫ MATCH_FOUND: ROOM_${roomId.slice(0, 8)}`);
+          router.push(`/battle?mode=online&roomId=${roomId}`);
+        },
+      );
+    }
   };
 
   if (!user || !userData) {
@@ -72,7 +109,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#0d1117] text-[#adbac7] font-mono p-8 relative">
-      {/* 上部ステータスバー */}
       <div className="max-w-5xl mx-auto flex justify-between items-center mb-12 border-b border-[#30363d] pb-4">
         <div className="flex items-center gap-3">
           <Terminal className="text-[#00ff41]" />
@@ -98,25 +134,25 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* メインメニュー */}
       <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
         <MenuCard
-          title="ONLINE_BATTLE"
-          desc="リアルタイムで世界中のエンジニアとコードの速さを競う。"
-          icon={<Globe className="w-10 h-10" />}
-          color="border-blue-500/50 hover:bg-blue-500/10"
-          onClick={() => {
-            addLog("≫ INITIALIZING_MATCHMAKING_PROTOCOL...");
-            startMatching(
-              userData.uid,
-              userData.displayName || "GUEST_USER",
-              userData.stats.rating,
-              (roomId) => {
-                // マッチングしたら対戦画面へ（mode=online）
-                router.push(`/battle?mode=online&roomId=${roomId}`);
-              },
-            );
-          }}
+          title={isMatching ? "MATCHING..." : "ONLINE_BATTLE"}
+          desc={
+            isMatching
+              ? "待機中... 他のエンジニアをスキャンしています。再クリックでキャンセル。"
+              : "リアルタイムで世界中のエンジニアとコードの速さを競う。"
+          }
+          icon={
+            <Globe
+              className={`w-10 h-10 ${isMatching ? "animate-spin text-blue-400" : ""}`}
+            />
+          }
+          color={
+            isMatching
+              ? "border-blue-400 bg-blue-500/20"
+              : "border-blue-500/50 hover:bg-blue-500/10"
+          }
+          onClick={handleOnlineBattleClick}
         />
 
         <MenuCard
@@ -139,7 +175,6 @@ export default function HomePage() {
         />
       </div>
 
-      {/* 戦績表示 */}
       <div className="max-w-5xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatBox
@@ -163,14 +198,19 @@ export default function HomePage() {
         </div>
         <div className="mt-6 p-4 bg-[#161b22] border border-[#30363d] rounded text-[10px] opacity-60 uppercase tracking-[0.2em]">
           {logs.map((log, i) => (
-            <p key={i} className={i === logs.length - 1 ? "animate-pulse" : ""}>
+            <p
+              key={i}
+              className={
+                i === logs.length - 1 ? "animate-pulse text-[#00ff41]" : ""
+              }
+            >
               {log}
             </p>
           ))}
         </div>
       </div>
 
-      {/* 出撃準備モーダル */}
+      {/* モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[#161b22] border border-[#00ff41]/30 p-8 rounded-lg max-w-md w-full shadow-[0_0_30px_rgba(0,255,65,0.1)] relative">
@@ -182,12 +222,10 @@ export default function HomePage() {
             >
               <X size={20} />
             </button>
-
             <h2 className="text-[#00ff41] text-xl font-bold mb-6 tracking-widest flex items-center gap-2">
               <Terminal size={20} /> INITIALIZE_ENGAGEMENT
             </h2>
 
-            {/* 難易度選択 */}
             <div className="mb-6">
               <p className="text-[10px] opacity-50 mb-3 uppercase font-bold tracking-widest">
                 Select_Difficulty
@@ -217,29 +255,20 @@ export default function HomePage() {
                 Tactical_Language
               </p>
               <div className="grid grid-cols-3 gap-2">
-                {/* 現在は C++ のみ表示 */}
                 {["cpp"].map((l) => (
                   <button
                     key={l}
                     type="button"
-                    onClick={() =>
-                      setSelectedConfig({ ...selectedConfig, lang: l })
-                    }
-                    className={`py-2 text-xs border rounded transition-all font-bold ${
-                      selectedConfig.lang === l
-                        ? "border-[#00ff41] bg-[#00ff41]/10 text-white shadow-[0_0_10px_rgba(0,255,65,0.2)]"
-                        : "border-[#30363d] text-gray-500 hover:border-gray-500"
-                    }`}
+                    className="py-2 text-xs border rounded transition-all font-bold border-[#00ff41] bg-[#00ff41]/10 text-white"
                   >
                     {l.toUpperCase()}
                   </button>
                 ))}
-                {/* 将来のためのプレースホルダー（非表示またはDisabled） */}
                 <div className="py-2 text-xs border border-[#30363d] text-gray-700 rounded flex items-center justify-center opacity-30 cursor-not-allowed">
-                  PYTHON (LOCKED)
+                  PYT
                 </div>
                 <div className="py-2 text-xs border border-[#30363d] text-gray-700 rounded flex items-center justify-center opacity-30 cursor-not-allowed">
-                  HTML (LOCKED)
+                  JAV
                 </div>
               </div>
             </div>
@@ -283,13 +312,6 @@ function StatBox({
   );
 }
 
-interface MenuCardProps {
-  title: string;
-  desc: string;
-  icon: React.ReactNode;
-  color: string;
-  onClick: () => void;
-}
 function MenuCard({ title, desc, icon, color, onClick }: MenuCardProps) {
   return (
     <button
@@ -306,4 +328,12 @@ function MenuCard({ title, desc, icon, color, onClick }: MenuCardProps) {
       <p className="text-sm opacity-70 leading-relaxed">{desc}</p>
     </button>
   );
+}
+
+interface MenuCardProps {
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+  color: string;
+  onClick: () => void;
 }
