@@ -2,8 +2,9 @@
 
 import { auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { subscribeUserStats, UserData } from "@/lib/user";
+import { startMatching } from "@/lib/matchmaking";
 import {
   Globe,
   Cpu,
@@ -25,6 +26,11 @@ export default function HomePage() {
   const router = useRouter();
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
+
+  const [logs, setLogs] = useState<string[]>(["≫ SYSTEM_INITIALIZED"]);
+  const addLog = useCallback((msg: string) => {
+    setLogs((prev) => [...prev.slice(-4), msg]); // 直近5件のみ保持
+  }, []);
 
   // モーダル管理用のステート
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -98,12 +104,18 @@ export default function HomePage() {
           title="ONLINE_BATTLE"
           desc="リアルタイムで世界中のエンジニアとコードの速さを競う。"
           icon={<Globe className="w-10 h-10" />}
-          color="border-blue-500/50 hover:bg-blue-500/10 hover:border-blue-400"
+          color="border-blue-500/50 hover:bg-blue-500/10"
           onClick={() => {
-            {
-              /* オンライン対戦は将来の実装予定 */
-            }
-            alert("ONLINE_MODE_COMING_SOON");
+            addLog("≫ INITIALIZING_MATCHMAKING_PROTOCOL...");
+            startMatching(
+              userData.uid,
+              userData.displayName || "GUEST_USER",
+              userData.stats.rating,
+              (roomId) => {
+                // マッチングしたら対戦画面へ（mode=online）
+                router.push(`/battle?mode=online&roomId=${roomId}`);
+              },
+            );
           }}
         />
 
@@ -149,9 +161,12 @@ export default function HomePage() {
             color="text-red-500"
           />
         </div>
-        <div className="mt-6 p-4 bg-[#161b22] border border-[#30363d] rounded text-[10px] opacity-60 uppercase tracking-[0.2em] flex justify-between">
-          <p className="animate-pulse">≫ SYSTEM_READY: Connection stable.</p>
-          <p>Location: Gifu, Japan [cite: 178]</p>
+        <div className="mt-6 p-4 bg-[#161b22] border border-[#30363d] rounded text-[10px] opacity-60 uppercase tracking-[0.2em]">
+          {logs.map((log, i) => (
+            <p key={i} className={i === logs.length - 1 ? "animate-pulse" : ""}>
+              {log}
+            </p>
+          ))}
         </div>
       </div>
 
