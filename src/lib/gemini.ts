@@ -98,5 +98,5 @@ export async function judgeCode(
   return JSON.parse(cleanJson);
 }
 
-// curl "https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyBmQceJ3OIDCuOrFyvGM2gNqbw8Ym72pio"
+// curl "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_API_KEY"
 // モデルの一覧
