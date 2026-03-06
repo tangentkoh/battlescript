@@ -39,7 +39,7 @@ export async function startMatching(
   if (opponentId) {
     // マッチング
     const opponent = pool[opponentId];
-    const roomId = `room_${uid}_${opponentId}`;
+    const roomId = `room_${Date.now()}_${Math.floor(Math.random() * 1000)}_${uid}_${opponentId}`;
     const roomRef = ref(rtdb, `rooms/${roomId}`);
 
     await set(roomRef, {
@@ -54,19 +54,21 @@ export async function startMatching(
     await remove(ref(rtdb, `matching_pool/${opponentId}`));
     onMatchFound(roomId);
   } else {
-    // 待機
     await set(userInPoolRef, { name, rating, joinedAt: serverTimestamp() });
 
     // 待機中にブラウザを閉じたら削除
     onDisconnect(userInPoolRef).remove();
 
     const roomsRef = ref(rtdb, "rooms");
-    const unsubscribe = onValue(roomsRef, (snapshot) => {
+    onValue(roomsRef, (snapshot) => {
       const rooms = snapshot.val();
       if (rooms) {
-        const matchedRoomId = Object.keys(rooms).find((id) => id.includes(uid));
+        const matchedRoomId = Object.keys(rooms).find(
+          (id) => id.includes(uid) && rooms[id].status === "playing",
+        );
+
         if (matchedRoomId) {
-          unsubscribe();
+          off(roomsRef);
           remove(userInPoolRef);
           onMatchFound(matchedRoomId);
         }
