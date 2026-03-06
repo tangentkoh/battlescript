@@ -9,6 +9,7 @@ import {
   updateUserSettings,
   updateDisplayName,
   resetUserStats,
+  getTopRankers,
 } from "@/lib/user";
 import {
   Terminal,
@@ -18,6 +19,8 @@ import {
   User,
   Trash2,
   CheckCircle,
+  Trophy,
+  Medal,
 } from "lucide-react";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -33,6 +36,7 @@ export default function SettingsPage() {
   const [newName, setNewName] = useState("");
   const [selectedBgm, setSelectedBgm] = useState("none");
   const [statusMsg, setStatusMsg] = useState("");
+  const [rankers, setRankers] = useState<UserData[]>([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -49,6 +53,14 @@ export default function SettingsPage() {
     });
     return () => unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    const fetchRanking = async () => {
+      const topUsers = await getTopRankers();
+      setRankers(topUsers);
+    };
+    fetchRanking();
+  }, []);
 
   const handleSave = async () => {
     if (!userData) return;
@@ -94,6 +106,56 @@ export default function SettingsPage() {
             <h1 className="text-xl font-bold tracking-widest text-white">
               SYSTEM_SETTINGS
             </h1>
+          </div>
+        </div>
+
+        {/* ランキングセクション */}
+        <div className="mb-12">
+          <h2 className="text-[#00ff41] text-sm font-bold mb-6 tracking-[0.3em] flex items-center gap-2">
+            <Trophy size={16} /> GLOBAL_TOP_RANKERS
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {rankers.map((player, index) => (
+              <div
+                key={player.uid}
+                className={`p-4 border bg-[#161b22] rounded relative overflow-hidden ${
+                  index === 0
+                    ? "border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]"
+                    : "border-[#30363d]"
+                }`}
+              >
+                {/* 順位バッジ */}
+                <div className="absolute top-2 right-2 opacity-20">
+                  <Medal
+                    size={40}
+                    className={
+                      index === 0
+                        ? "text-yellow-500"
+                        : index === 1
+                          ? "text-gray-400"
+                          : "text-amber-700"
+                    }
+                  />
+                </div>
+
+                <div className="text-[10px] opacity-50 uppercase font-bold">
+                  Rank_0{index + 1}
+                </div>
+                <div className="text-white font-bold truncate pr-8">
+                  {player.displayName || "GUEST_USER"}
+                </div>
+                <div
+                  className={`text-xl font-black mt-1 ${
+                    index === 0 ? "text-yellow-500" : "text-[#adbac7]"
+                  }`}
+                >
+                  {player.stats.rating}{" "}
+                  <span className="text-[10px] opacity-50 font-normal ml-1">
+                    RP
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

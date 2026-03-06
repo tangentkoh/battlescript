@@ -123,7 +123,8 @@ function BattleContent() {
     if (mode === "cpu" && battleActive && !loading) {
       const tid = setInterval(() => {
         setCpuProgress((p) => {
-          const inc = difficulty === "easy" ? 0.4 : 0.2;
+          const inc =
+            difficulty === "easy" ? 0.4 : difficulty === "medium" ? 0.2 : 0.1;
           if (p >= 100) {
             handleBattleEnd("CPU_WIN");
             return 100;
