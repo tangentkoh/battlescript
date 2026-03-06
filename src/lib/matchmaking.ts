@@ -37,36 +37,37 @@ export async function startMatching(
   }
 
   if (opponentId) {
-    // マッチング
+    // ホストとしてマッチング成立
     const opponent = pool[opponentId];
-    const roomId = `room_${Date.now()}_${Math.floor(Math.random() * 1000)}_${uid}_${opponentId}`;
+    const roomId = `room_${uid}_${opponentId}`;
     const roomRef = ref(rtdb, `rooms/${roomId}`);
 
     await set(roomRef, {
       status: "playing",
+      host: uid,
       players: {
         [uid]: { name, progress: 0, isFinished: false },
         [opponentId]: { name: opponent.name, progress: 0, isFinished: false },
       },
+      problem: null,
       createdAt: serverTimestamp(),
     });
 
     await remove(ref(rtdb, `matching_pool/${opponentId}`));
     onMatchFound(roomId);
   } else {
+    // ゲストとしてプールに参加
     await set(userInPoolRef, { name, rating, joinedAt: serverTimestamp() });
-
-    // 待機中にブラウザを閉じたら削除
     onDisconnect(userInPoolRef).remove();
 
     const roomsRef = ref(rtdb, "rooms");
     onValue(roomsRef, (snapshot) => {
       const rooms = snapshot.val();
       if (rooms) {
+        // 自分が含まれている進行中の部屋を探す
         const matchedRoomId = Object.keys(rooms).find(
           (id) => id.includes(uid) && rooms[id].status === "playing",
         );
-
         if (matchedRoomId) {
           off(roomsRef);
           remove(userInPoolRef);
@@ -114,4 +115,24 @@ export function subscribeOpponent(
 export function setupDisconnectDefeat(roomId: string, uid: string) {
   const playerRef = ref(rtdb, `rooms/${roomId}/players/${uid}/isFinished`);
   onDisconnect(playerRef).set(true);
+}
+
+// ルーム破壊
+export async function leaveRoom(roomId: string, uid: string) {
+  const roomRef = ref(rtdb, `rooms/${roomId}`);
+  const snapshot = await get(roomRef);
+  const roomData = snapshot.val();
+
+  if (!roomData) return;
+
+  const playerRef = ref(rtdb, `rooms/${roomId}/players/${uid}`);
+  await remove(playerRef);
+
+  const updatedSnapshot = await get(ref(rtdb, `rooms/${roomId}/players`));
+  const remainingPlayers = updatedSnapshot.val();
+
+  if (!remainingPlayers || Object.keys(remainingPlayers).length === 0) {
+    await remove(roomRef);
+    console.log(`≫ ROOM_${roomId}_DELETED_SUCCESSFULLY`);
+  }
 }
