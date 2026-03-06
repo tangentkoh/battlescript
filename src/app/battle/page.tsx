@@ -12,13 +12,15 @@ import { Send, Globe, Cpu, Loader2 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { generateProblem, Problem, judgeCode } from "@/lib/gemini";
 import { updateBattleResult, subscribeUserStats, UserData } from "@/lib/user";
-import { auth } from "@/lib/firebase";
+import { auth, rtdb } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { ref, onValue, update } from "firebase/database";
 import {
   updateProgress,
   subscribeOpponent,
   reportVictory,
   setupDisconnectDefeat,
+  leaveRoom,
   PlayerSyncData,
 } from "@/lib/matchmaking";
 
@@ -80,7 +82,7 @@ function BattleContent() {
     [mode, roomId, battleActive],
   );
 
-  // ユーザー監視
+  // ユーザー認証監視
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) router.push("/");
@@ -96,18 +98,23 @@ function BattleContent() {
   // オンライン同期
   useEffect(() => {
     if (mode === "online" && roomId && userData) {
-      const oppId = roomId
-        .replace("room_", "")
-        .replace(userData.uid, "")
-        .replace("_", "");
-      const unsubscribe = subscribeOpponent(roomId, oppId, (data) => {
-        setOpponentData(data);
-        if (data?.isFinished && battleActive) handleBattleEnd("CPU_WIN"); // 相手が勝利
-      });
-      return () => unsubscribe();
+      // 自分以外のUIDを特定
+      const parts = roomId.split("_");
+      const oppId = parts.find(
+        (id) => id !== userData.uid && id !== "room" && !/^\d+$/.test(id),
+      );
+
+      if (oppId) {
+        const unsubscribe = subscribeOpponent(roomId, oppId, (data) => {
+          setOpponentData(data);
+          if (data?.isFinished && battleActive) handleBattleEnd("CPU_WIN");
+        });
+        return () => unsubscribe();
+      }
     }
   }, [mode, roomId, userData, battleActive, handleBattleEnd]);
 
+  // 自分の進捗送信
   useEffect(() => {
     if (mode === "online" && battleActive && roomId && userData) {
       const tid = setInterval(() => {
@@ -118,7 +125,7 @@ function BattleContent() {
     }
   }, [mode, battleActive, roomId, userData, code.length]);
 
-  // CPU進捗
+  // CPU進捗ロジック
   useEffect(() => {
     if (mode === "cpu" && battleActive && !loading) {
       const tid = setInterval(() => {
@@ -136,31 +143,57 @@ function BattleContent() {
     }
   }, [mode, battleActive, loading, difficulty, handleBattleEnd]);
 
-  // 問題生成
+  // 問題生成 & 同期ロジック
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const p = await generateProblem(difficulty);
-        if (active) {
-          setProblem(p);
-          setBattleActive(true);
-          setCoolDown(30);
-          addLog(`[SYSTEM]: BATTLE_START // MODE:${mode.toUpperCase()}`);
-        }
-      } catch {
-        if (active) addLog("[ERROR]: Gemini API Offline.");
-      } finally {
-        if (active) setLoading(false);
+    if (mode !== "online" || !roomId || !userData) {
+      if (mode === "cpu" && !problem) {
+        (async () => {
+          try {
+            setLoading(true);
+            const p = await generateProblem(difficulty);
+            setProblem(p);
+            setBattleActive(true);
+            setLoading(false);
+            addLog(`[SYSTEM]: BATTLE_START // MODE:CPU`);
+          } catch {
+            addLog("[ERROR]: Gemini API Offline.");
+            setLoading(false);
+          }
+        })();
       }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [difficulty, mode, addLog]);
+      return;
+    }
 
-  // クールダウン
+    const roomRef = ref(rtdb, `rooms/${roomId}`);
+    const unsubscribe = onValue(roomRef, async (snapshot) => {
+      const roomData = snapshot.val();
+      if (!roomData) return;
+
+      if (roomData.host === userData.uid && !roomData.problem && loading) {
+        try {
+          const newProblem = await generateProblem(difficulty);
+          await update(roomRef, { problem: newProblem });
+        } catch {
+          // 'e' を削除（使わないため）
+          addLog("[ERROR]: Failed to generate problem.");
+        }
+      }
+
+      if (roomData.problem && !problem) {
+        setProblem(roomData.problem);
+        setBattleActive(true);
+        setLoading(false);
+        addLog("≫ CONNECTION_STABLE. PROBLEM_SYNCED.");
+      }
+    });
+
+    // ここで unsubscribe を使用することで警告を解消し、適切に監視を解除する
+    return () => {
+      unsubscribe();
+    };
+  }, [roomId, userData, mode, difficulty, problem, loading, addLog]);
+
+  // クールダウン処理
   useEffect(() => {
     if (coolDown > 0) {
       const tid = setTimeout(() => setCoolDown(coolDown - 1), 1000);
@@ -188,7 +221,7 @@ function BattleContent() {
     return (
       <div className="min-h-screen bg-[#0d1117] flex flex-col items-center justify-center font-mono text-[#00ff41] gap-4">
         <Loader2 className="animate-spin" size={40} />
-        <div>INITIALIZING_BATTLE...</div>
+        <div>INITIALIZING_BATTLE_STATION...</div>
       </div>
     );
 
@@ -212,8 +245,10 @@ function BattleContent() {
           <div className="flex items-center gap-2 bg-black/30 px-3 py-1 rounded border border-[#30363d] text-[10px]">
             {mode === "cpu" ? <Cpu size={12} /> : <Globe size={12} />}
             <span>
-              {mode.toUpperCase()} {/* */} {language.toUpperCase()} {/* */}{" "}
-              {difficulty.toUpperCase()}
+              {mode.toUpperCase()}
+              {/* */}
+              {language.toUpperCase()}
+              {/* */} {difficulty.toUpperCase()}
             </span>
           </div>
         </div>
@@ -287,14 +322,16 @@ function BattleContent() {
               type="button"
               onClick={handleSubmit}
               disabled={coolDown > 0 || isSubmitting}
-              className={`flex items-center gap-2 px-8 py-2 rounded font-bold transition-all shadow-md ${coolDown > 0 || isSubmitting ? "bg-gray-700 text-gray-500" : "bg-[#00ff41] text-black hover:bg-green-400 active:scale-95"}`}
+              className={`flex items-center gap-2 px-8 py-2 rounded font-bold transition-all shadow-md ${coolDown > 0 || isSubmitting ? "bg-gray-700 text-gray-500 border-none" : "bg-[#00ff41] text-black hover:bg-green-400 active:scale-95"}`}
             >
               {isSubmitting ? (
                 <Loader2 className="animate-spin" size={18} />
               ) : (
                 <Send size={18} />
               )}
-              <span className="text-xs uppercase">Submit_Solution</span>
+              <span className="text-xs uppercase">
+                {isSubmitting ? "JUDGING" : "SUBMIT"}
+              </span>
             </button>
           </div>
         </div>
@@ -322,13 +359,18 @@ function BattleContent() {
                 <span
                   className={`text-4xl font-black ${battleResult === "PLAYER_WIN" ? "text-[#00ff41]" : "text-red-500"}`}
                 >
-                  {battleResult === "PLAYER_WIN" ? "UP" : "DOWN"}
+                  {battleResult === "PLAYER_WIN" ? "↑" : "↓"}
                 </span>
               </div>
             </div>
             <button
               type="button"
-              onClick={() => router.push("/home")}
+              onClick={async () => {
+                if (mode === "online" && roomId && userData) {
+                  await leaveRoom(roomId, userData.uid);
+                }
+                router.push("/home");
+              }}
               className={`w-full py-4 font-black tracking-widest ${battleResult === "PLAYER_WIN" ? "bg-[#00ff41] text-black" : "bg-red-600 text-white"}`}
             >
               RETURN_TO_BASE
