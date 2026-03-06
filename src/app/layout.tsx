@@ -20,24 +20,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   useEffect(() => {
-    // アプリ全体でログイン状態とユーザー設定（BGM）を監視
+    let unsubscribeStats: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // ユーザーが変わるたびに古い購読を解除し、音楽を一度止める
+      if (unsubscribeStats) {
+        unsubscribeStats();
+        unsubscribeStats = null;
+      }
+      audioManager.playBgm("none");
+
       if (user) {
-        // ログイン中なら、そのユーザーの設定（BGMなど）を購読
-        const unsubscribeStats = subscribeUserStats(user.uid, (data) => {
-          if (data.settings?.bgm) {
-            // Firestoreの設定が変わるたびにBGMを更新
+        unsubscribeStats = subscribeUserStats(user.uid, (data) => {
+          // 自分の設定のみを確実に反映
+          if (data && data.settings?.bgm) {
             audioManager.playBgm(data.settings.bgm);
           }
         });
-        return () => unsubscribeStats();
-      } else {
-        // 未ログイン時はBGMを止める
-        audioManager.playBgm("none");
       }
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      if (unsubscribeAuth) unsubscribeAuth();
+      if (unsubscribeStats) unsubscribeStats();
+    };
   }, []);
 
   return (
