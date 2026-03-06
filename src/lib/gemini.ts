@@ -18,9 +18,8 @@ export interface Problem {
 export async function generateProblem(
   difficulty: "easy" | "medium" | "hard",
 ): Promise<Problem> {
-  // モデル名の指定に 'models/' を付与（404エラー対策）
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.1-flash-lite-preview",
   });
 
   const prompt = `
@@ -47,7 +46,7 @@ export async function generateProblem(
     const response = await result.response;
     const text = response.text();
 
-    // JSON部分だけを抽出する正規表現
+    // JSON部分だけを抽出
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("JSON_PARSE_ERROR");
 
@@ -65,7 +64,7 @@ export async function judgeCode(
   language: string,
 ): Promise<{ isCorrect: boolean; feedback: string }> {
   const model = genAI.getGenerativeModel({
-    model: "gemini-3-flash-preview",
+    model: "gemini-3.1-flash-lite-preview",
   });
 
   const prompt = `
@@ -99,5 +98,5 @@ export async function judgeCode(
   return JSON.parse(cleanJson);
 }
 
-// curl "https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyBmQceJ3OIDCuOrFyvGM2gNqbw8Ym72pio"
+// curl "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_API_KEY"
 // モデルの一覧
