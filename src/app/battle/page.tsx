@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  Suspense,
+} from "react";
 import Editor from "@monaco-editor/react";
 import { Send, Globe, Cpu, Loader2 } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -16,7 +22,7 @@ import {
   PlayerSyncData,
 } from "@/lib/matchmaking";
 
-export default function BattlePage() {
+function BattleContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -330,5 +336,22 @@ export default function BattlePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function BattlePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0d1117] flex flex-col items-center justify-center font-mono text-[#00ff41] gap-4">
+          <Loader2 className="animate-spin" size={40} />
+          <div className="animate-pulse tracking-widest">
+            LOADING_RESOURCES...
+          </div>
+        </div>
+      }
+    >
+      <BattleContent />
+    </Suspense>
   );
 }
