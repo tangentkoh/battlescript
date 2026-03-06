@@ -1,8 +1,19 @@
 import { db } from "./firebase";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  serverTimestamp,
+  onSnapshot,
+  updateDoc,
+  increment,
+  query,
+  orderBy,
+  limit,
+  getDocs,
+  collection,
+} from "firebase/firestore";
 import { User as FirebaseUser } from "firebase/auth";
-import { onSnapshot } from "firebase/firestore";
-import { updateDoc, increment } from "firebase/firestore";
 
 export async function syncUserToFirestore(user: FirebaseUser) {
   const userRef = doc(db, "users", user.uid);
@@ -111,4 +122,19 @@ export async function updateBattleResult(
       "stats.rating": increment(isWin ? 10 : -10),
     });
   }
+}
+
+// 上位ランカーを取得する
+export async function getTopRankers(): Promise<UserData[]> {
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, orderBy("stats.rating", "desc"), limit(3));
+
+  const querySnapshot = await getDocs(q);
+  const rankers: UserData[] = [];
+
+  querySnapshot.forEach((doc) => {
+    rankers.push(doc.data() as UserData);
+  });
+
+  return rankers;
 }
