@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Terminal, ShieldCheck } from "lucide-react";
 import { syncUserToFirestore } from "@/lib/user";
 
+// ログインページ
 export default function LoginPage() {
   const router = useRouter();
 
@@ -32,7 +33,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0d1117] flex items-center justify-center font-mono">
       <div className="max-w-md w-full p-8 border border-[#30363d] bg-[#161b22] rounded-lg shadow-2xl text-center">
-        {/* アイコン演出 */}
         <div className="mb-6 flex justify-center">
           <div className="p-4 rounded-full bg-black/40 border border-[#00ff41]/30">
             <ShieldCheck className="w-12 h-12 text-[#00ff41] animate-pulse" />

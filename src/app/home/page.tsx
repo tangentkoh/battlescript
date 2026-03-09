@@ -38,7 +38,7 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState({
     lang: "cpp",
-    diff: "easy",
+    diff: "medium",
     mode: "cpu",
   });
 
@@ -210,7 +210,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* モーダル */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-[#161b22] border border-[#00ff41]/30 p-8 rounded-lg max-w-md w-full shadow-[0_0_30px_rgba(0,255,65,0.1)] relative">
@@ -255,21 +254,22 @@ export default function HomePage() {
                 Tactical_Language
               </p>
               <div className="grid grid-cols-3 gap-2">
-                {["cpp"].map((l) => (
+                {["cpp", "python", "java"].map((l) => (
                   <button
                     key={l}
                     type="button"
-                    className="py-2 text-xs border rounded transition-all font-bold border-[#00ff41] bg-[#00ff41]/10 text-white"
+                    onClick={() =>
+                      setSelectedConfig({ ...selectedConfig, lang: l })
+                    }
+                    className={`py-2 text-xs border rounded transition-all font-bold ${
+                      selectedConfig.lang === l
+                        ? "border-[#00ff41] bg-[#00ff41]/10 text-white shadow-[0_0_10px_rgba(0,255,65,0.2)]"
+                        : "border-[#30363d] text-gray-500 hover:border-gray-500"
+                    }`}
                   >
                     {l.toUpperCase()}
                   </button>
                 ))}
-                <div className="py-2 text-xs border border-[#30363d] text-gray-700 rounded flex items-center justify-center opacity-30 cursor-not-allowed">
-                  PYT
-                </div>
-                <div className="py-2 text-xs border border-[#30363d] text-gray-700 rounded flex items-center justify-center opacity-30 cursor-not-allowed">
-                  JAV
-                </div>
               </div>
             </div>
 

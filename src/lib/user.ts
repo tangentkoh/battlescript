@@ -110,12 +110,12 @@ export async function updateBattleResult(
   const userRef = doc(db, "users", uid);
 
   if (isCpuBattle) {
-    // 対CPU：勝てば+1、負ければ-1
+    // 対CPU
     await updateDoc(userRef, {
       "stats.rating": increment(isWin ? 1 : -1),
     });
   } else {
-    // 対人：勝ち負けのカウント
+    // 対人
     await updateDoc(userRef, {
       "stats.wins": isWin ? increment(1) : increment(0),
       "stats.losses": isWin ? increment(0) : increment(1),
@@ -124,7 +124,7 @@ export async function updateBattleResult(
   }
 }
 
-// 上位ランカーを取得する
+// 上位ランカーを取得
 export async function getTopRankers(): Promise<UserData[]> {
   const usersRef = collection(db, "users");
   const q = query(usersRef, orderBy("stats.rating", "desc"), limit(3));
