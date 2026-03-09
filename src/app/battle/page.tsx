@@ -32,7 +32,13 @@ function BattleContent() {
   const language = searchParams.get("lang") || "cpp";
   const difficulty =
     (searchParams.get("diff") as "easy" | "medium" | "hard") || "easy";
+  const editorLanguageMap: Record<string, string> = {
+    cpp: "cpp",
+    python: "python",
+    java: "java",
+  };
   const roomId = searchParams.get("roomId");
+  const hasInitialized = useRef(false);
 
   const [problem, setProblem] = useState<Problem | null>(null);
   const [code, setCode] = useState<string>("");
@@ -145,12 +151,14 @@ function BattleContent() {
 
   // 問題生成 & 同期ロジック
   useEffect(() => {
+    if (hasInitialized.current) return;
     if (mode !== "online" || !roomId || !userData) {
       if (mode === "cpu" && !problem) {
+        hasInitialized.current = true;
         (async () => {
           try {
             setLoading(true);
-            const p = await generateProblem(difficulty);
+            const p = await generateProblem(difficulty, language);
             setProblem(p);
             setBattleActive(true);
             setLoading(false);
@@ -164,6 +172,7 @@ function BattleContent() {
       return;
     }
 
+    hasInitialized.current = true;
     const roomRef = ref(rtdb, `rooms/${roomId}`);
     const unsubscribe = onValue(roomRef, async (snapshot) => {
       const roomData = snapshot.val();
@@ -171,7 +180,7 @@ function BattleContent() {
 
       if (roomData.host === userData.uid && !roomData.problem && loading) {
         try {
-          const newProblem = await generateProblem(difficulty);
+          const newProblem = await generateProblem(difficulty, language);
           await update(roomRef, { problem: newProblem });
         } catch {
           // 'e' を削除（使わないため）
@@ -187,11 +196,11 @@ function BattleContent() {
       }
     });
 
-    // ここで unsubscribe を使用することで警告を解消し、適切に監視を解除する
+    // ここで unsubscribe を使用することで警告を解消
     return () => {
       unsubscribe();
     };
-  }, [roomId, userData, mode, difficulty, problem, loading, addLog]);
+  }, [roomId, userData, mode, difficulty, language, problem, loading, addLog]);
 
   // クールダウン処理
   useEffect(() => {
@@ -302,7 +311,7 @@ function BattleContent() {
         <div className="flex-1 relative">
           <Editor
             height="100%"
-            language="cpp"
+            language={" " + editorLanguageMap[language] || " cpp"}
             theme="vs-dark"
             value={code}
             onChange={(v) => setCode(v || "")}
@@ -338,15 +347,31 @@ function BattleContent() {
       </main>
 
       {showResult && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md overflow-y-auto p-4">
           <div
-            className={`p-10 border-2 rounded-lg text-center max-w-lg w-full ${battleResult === "PLAYER_WIN" ? "border-[#00ff41]" : "border-red-500"}`}
+            className={`p-8 border-2 rounded-lg max-w-2xl w-full bg-[#161b22] ${
+              battleResult === "PLAYER_WIN"
+                ? "border-[#00ff41]"
+                : "border-red-500"
+            }`}
           >
             <h2
-              className={`text-5xl font-black italic mb-2 ${battleResult === "PLAYER_WIN" ? "text-[#00ff41]" : "text-red-500"}`}
+              className={`text-4xl font-black italic mb-4 ${
+                battleResult === "PLAYER_WIN"
+                  ? "text-[#00ff41]"
+                  : "text-red-500"
+              }`}
             >
               {battleResult === "PLAYER_WIN" ? "BATTLE_WIN" : "BATTLE_LOSE"}
             </h2>
+            <div className="mt-6 text-left">
+              <p className="text-[10px] text-gray-500 mb-2 uppercase font-bold tracking-widest">
+                Model_Solution ({language.toUpperCase()})
+              </p>
+              <div className="bg-black/60 p-4 rounded border border-[#30363d] max-h-60 overflow-y-auto text-xs text-blue-300 font-mono whitespace-pre">
+                {problem?.model_solution || "NO_SOLUTION_AVAILABLE"}
+              </div>
+            </div>
             <div className="bg-black/50 border border-[#30363d] p-6 rounded my-8">
               <p className="text-[10px] text-gray-500 mb-1 uppercase">
                 Rating_Adjustment
@@ -366,12 +391,15 @@ function BattleContent() {
             <button
               type="button"
               onClick={async () => {
-                if (mode === "online" && roomId && userData) {
+                if (mode === "online" && roomId && userData)
                   await leaveRoom(roomId, userData.uid);
-                }
                 router.push("/home");
               }}
-              className={`w-full py-4 font-black tracking-widest ${battleResult === "PLAYER_WIN" ? "bg-[#00ff41] text-black" : "bg-red-600 text-white"}`}
+              className={`w-full py-4 font-black tracking-widest ${
+                battleResult === "PLAYER_WIN"
+                  ? "bg-[#00ff41] text-black"
+                  : "bg-red-600 text-white"
+              }`}
             >
               RETURN_TO_BASE
             </button>

@@ -90,10 +90,10 @@ export default function SettingsPage() {
 
   if (!userData) return <div className="bg-[#0d1117] min-h-screen" />;
 
+  // 設定画面
   return (
     <div className="min-h-screen bg-[#0d1117] text-[#adbac7] font-mono p-8">
       <div className="max-w-2xl mx-auto">
-        {/* ヘッダー */}
         <div className="flex items-center justify-between mb-12 border-b border-[#30363d] pb-4">
           <button
             onClick={() => router.push("/home")}
@@ -109,7 +109,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* ランキングセクション */}
         <div className="mb-12">
           <h2 className="text-[#00ff41] text-sm font-bold mb-6 tracking-[0.3em] flex items-center gap-2">
             <Trophy size={16} /> GLOBAL_TOP_RANKERS
@@ -124,7 +123,6 @@ export default function SettingsPage() {
                     : "border-[#30363d]"
                 }`}
               >
-                {/* 順位バッジ */}
                 <div className="absolute top-2 right-2 opacity-20">
                   <Medal
                     size={40}
@@ -160,7 +158,6 @@ export default function SettingsPage() {
         </div>
 
         <div className="space-y-10">
-          {/* プロフィール設定 */}
           <section className="bg-[#161b22] border border-[#30363d] p-6 rounded-lg">
             <h2 className="text-[#00ff41] text-xs font-bold mb-6 flex items-center gap-2">
               <User size={14} /> USER_PROFILE_MANAGEMENT
@@ -186,7 +183,6 @@ export default function SettingsPage() {
             </div>
           </section>
 
-          {/* BGM設定 */}
           <section className="bg-[#161b22] border border-[#30363d] p-6 rounded-lg">
             <h2 className="text-[#00ff41] text-xs font-bold mb-6 flex items-center gap-2">
               <Music size={14} /> AUDIO_ENVIRONMENT_CONFIG
@@ -214,7 +210,6 @@ export default function SettingsPage() {
             </p>
           </section>
 
-          {/* 危険エリア */}
           <section className="border border-red-900/30 p-6 rounded-lg bg-red-900/5">
             <h2 className="text-red-500 text-xs font-bold mb-6 flex items-center gap-2">
               <Trash2 size={14} /> DANGER_ZONE
@@ -227,7 +222,6 @@ export default function SettingsPage() {
             </button>
           </section>
 
-          {/* 保存ボタン・ステータス */}
           <div className="flex items-center gap-6 pt-4">
             <button
               onClick={handleSave}

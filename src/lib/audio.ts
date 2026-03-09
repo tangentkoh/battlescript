@@ -1,4 +1,3 @@
-// src/lib/audio.ts
 import { Howl } from "howler";
 
 class AudioManager {
@@ -16,12 +15,12 @@ class AudioManager {
   }
 
   playBgm(bgmId: string) {
-    if (this.currentBgmId === bgmId) return; // 同じ曲なら何もしない
+    if (this.currentBgmId === bgmId) return;
 
     if (this.currentBgm) {
-      this.currentBgm.fade(1, 0, 1000); // 1秒かけてフェードアウト
+      this.currentBgm.fade(1, 0, 2000); // 2秒かけてフェードアウト
       const oldBgm = this.currentBgm;
-      setTimeout(() => oldBgm.stop(), 1000);
+      setTimeout(() => oldBgm.stop(), 2000);
     }
 
     if (bgmId === "none") {
@@ -30,7 +29,6 @@ class AudioManager {
       return;
     }
 
-    // public/bgm/ フォルダにファイルを置く想定
     this.currentBgm = new Howl({
       src: [`/bgm/${bgmId}.mp3`],
       loop: true,
@@ -39,7 +37,7 @@ class AudioManager {
     });
 
     this.currentBgm.play();
-    this.currentBgm.fade(0, 0.5, 2000); // 2秒かけてフェードイン
+    this.currentBgm.fade(0, 0.5, 2000);
     this.currentBgmId = bgmId;
   }
 }

@@ -1,4 +1,3 @@
-// 問題の生成
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(
@@ -13,6 +12,7 @@ export interface Problem {
   sample_input: string;
   sample_output: string;
   test_cases: { input: string; output: string }[];
+  model_solution: string;
 }
 
 // 安定性を重視したモデル優先順位
@@ -27,8 +27,10 @@ interface GeminiError extends Error {
   status?: number;
 }
 
+// 問題の生成
 export async function generateProblem(
   difficulty: "easy" | "medium" | "hard",
+  language: string,
 ): Promise<Problem> {
   let lastError: GeminiError | null = null;
 
@@ -41,10 +43,11 @@ export async function generateProblem(
         const model = genAI.getGenerativeModel({ model: modelName });
         const prompt = `
           あなたは競技プログラミングの問題作成者です。
-          以下の条件で、C++で解くための問題を1つ作成し、JSON形式のみで出力してください。
+          以下の条件で、${language.toUpperCase()}で解くための問題を1つ作成し、JSON形式のみで出力してください。
           
           【条件】
           - 難易度: ${difficulty} (AtCoderの ${difficulty === "easy" ? "ABC-A" : difficulty === "medium" ? "ABC-B" : "ABC-C"} 相当)
+          - 言語特性: ${language.toUpperCase()} で標準入出力を用いて解ける内容にしてください。
           - 形式: 
             {
               "title": "問題タイトル",
@@ -54,8 +57,9 @@ export async function generateProblem(
               "sample_input": "入力例1",
               "sample_output": "出力例1",
               "test_cases": [{"input": "テスト用入力1", "output": "テスト用出力1"}] 
+              "model_solution": "この問題を解くための${language.toUpperCase()}による完全な模範解答コード"
             }
-          - 注意: 解説や余計な文章は一切含めず、純粋なJSONのみを返してください。
+          - 注意: 解説や余計な文章は一切含めず、純粋なJSONのみを返してください。また、模範解答コードは、エスケープされた文字列としてJSONに含めてください。
         `;
 
         const result = await model.generateContent(prompt);
@@ -89,9 +93,7 @@ export async function generateProblem(
   throw lastError || new Error("ALL_MODELS_UNAVAILABLE");
 }
 
-/**
- * 提出されたコードをGeminiに判定させる
- */
+// コードのジャッジ
 export async function judgeCode(
   problem: Problem,
   code: string,
