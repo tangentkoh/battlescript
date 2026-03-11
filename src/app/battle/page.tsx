@@ -149,7 +149,7 @@ function BattleContent() {
     }
   }, [mode, battleActive, loading, difficulty, handleBattleEnd]);
 
-  // 問題生成 & 同期ロジック
+  // 問題生成と同期ロジック
   useEffect(() => {
     if (hasInitialized.current) return;
     if (mode !== "online" || !roomId || !userData) {
@@ -181,22 +181,25 @@ function BattleContent() {
       if (roomData.host === userData.uid && !roomData.problem && loading) {
         try {
           const newProblem = await generateProblem(difficulty, language);
-          await update(roomRef, { problem: newProblem });
+          await update(roomRef, {
+            problem: newProblem,
+            language: language,
+          });
         } catch {
-          // 'e' を削除（使わないため）
           addLog("[ERROR]: Failed to generate problem.");
         }
       }
 
       if (roomData.problem && !problem) {
         setProblem(roomData.problem);
+        if (roomData.language) {
+          addLog(`≫ SYNC_LANGUAGE: ${roomData.language.toUpperCase()}`);
+        }
         setBattleActive(true);
         setLoading(false);
         addLog("≫ CONNECTION_STABLE. PROBLEM_SYNCED.");
       }
     });
-
-    // ここで unsubscribe を使用することで警告を解消
     return () => {
       unsubscribe();
     };
