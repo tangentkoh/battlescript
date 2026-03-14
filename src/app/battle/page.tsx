@@ -230,7 +230,7 @@ function BattleContent() {
     return (
       <div className="min-h-screen bg-[#0d1117] flex flex-col items-center justify-center font-mono text-[#00ff41] gap-4">
         <Loader2 className="animate-spin" size={40} />
-        <div>INITIALIZING_BATTLE_STATION...</div>
+        <div>INITIALIZING_BATTLE_ZONE...</div>
       </div>
     );
 

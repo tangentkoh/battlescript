@@ -59,7 +59,9 @@ export async function generateProblem(
               "test_cases": [{"input": "テスト用入力1", "output": "テスト用出力1"}] 
               "model_solution": "この問題を解くための${language.toUpperCase()}による完全な模範解答コード"
             }
-          - 注意: 解説や余計な文章は一切含めず、純粋なJSONのみを返してください。また、模範解答コードは、エスケープされた文字列としてJSONに含めてください。
+          - 注意: 解説や余計な文章は一切含めず、純粋なJSONのみを返してください。
+          - 注意: 模範解答コードは、エスケープされた文字列としてJSONに含めてください。
+          - 注意: 問題文の最後に言語と難易度を明記してください（例: "この問題は${language.toUpperCase()}の${difficulty}問題です。"）。
         `;
 
         const result = await model.generateContent(prompt);

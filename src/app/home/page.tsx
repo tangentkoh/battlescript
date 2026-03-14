@@ -115,7 +115,7 @@ export default function HomePage() {
         <div className="flex items-center gap-3">
           <Terminal className="text-[#00ff41]" />
           <h1 className="text-xl font-bold tracking-tighter text-white uppercase">
-            BattleScript // HQ
+            BattleScript // HOME
           </h1>
         </div>
         <div className="flex items-center gap-6 text-sm">
