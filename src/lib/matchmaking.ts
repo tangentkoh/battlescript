@@ -23,6 +23,7 @@ export async function startMatching(
   uid: string,
   name: string,
   rating: number,
+  config: { lang: string; diff: string },
   onMatchFound: (roomId: string) => void,
 ) {
   const poolRef = ref(rtdb, "matching_pool");
@@ -45,6 +46,8 @@ export async function startMatching(
     await set(roomRef, {
       status: "playing",
       host: uid,
+      language: config.lang,
+      difficulty: config.diff,
       players: {
         [uid]: { name, progress: 0, isFinished: false },
         [opponentId]: { name: opponent.name, progress: 0, isFinished: false },

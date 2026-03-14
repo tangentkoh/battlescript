@@ -180,11 +180,11 @@ function BattleContent() {
 
       if (roomData.host === userData.uid && !roomData.problem && loading) {
         try {
-          const newProblem = await generateProblem(difficulty, language);
-          await update(roomRef, {
-            problem: newProblem,
-            language: language,
-          });
+          const newProblem = await generateProblem(
+            roomData.difficulty,
+            roomData.language,
+          );
+          await update(roomRef, { problem: newProblem });
         } catch {
           addLog("[ERROR]: Failed to generate problem.");
         }
@@ -192,9 +192,6 @@ function BattleContent() {
 
       if (roomData.problem && !problem) {
         setProblem(roomData.problem);
-        if (roomData.language) {
-          addLog(`≫ SYNC_LANGUAGE: ${roomData.language.toUpperCase()}`);
-        }
         setBattleActive(true);
         setLoading(false);
         addLog("≫ CONNECTION_STABLE. PROBLEM_SYNCED.");

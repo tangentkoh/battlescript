@@ -38,7 +38,7 @@ export default function HomePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState({
     lang: "cpp",
-    diff: "medium",
+    diff: "easy",
     mode: "cpu",
   });
 
@@ -74,7 +74,6 @@ export default function HomePage() {
   // オンライン対戦ボタンのハンドラ
   const handleOnlineBattleClick = async () => {
     if (!userData) return;
-
     if (isMatching) {
       // 待機中ならキャンセル
       await cancelMatching(userData.uid);
@@ -88,10 +87,13 @@ export default function HomePage() {
         userData.uid,
         userData.displayName || "GUEST_USER",
         userData.stats.rating,
+        { lang: selectedConfig.lang, diff: selectedConfig.diff },
         (roomId: string) => {
           setIsMatching(false);
           addLog(`≫ MATCH_FOUND: ROOM_${roomId.slice(0, 8)}`);
-          router.push(`/battle?mode=online&roomId=${roomId}`);
+          router.push(
+            `/battle?mode=online&roomId=${roomId}&lang=${selectedConfig.lang}&diff=${selectedConfig.diff}`,
+          );
         },
       );
     }
@@ -152,12 +154,19 @@ export default function HomePage() {
               ? "border-blue-400 bg-blue-500/20"
               : "border-blue-500/50 hover:bg-blue-500/10"
           }
-          onClick={handleOnlineBattleClick}
+          onClick={() => {
+            if (isMatching) {
+              handleOnlineBattleClick();
+            } else {
+              setSelectedConfig({ ...selectedConfig, mode: "online" });
+              setIsModalOpen(true);
+            }
+          }}
         />
 
         <MenuCard
           title="CPU_BATTLE"
-          desc="練習モード。自分に最適な難易度のAIと戦う。"
+          desc="練習モード。自分に最適な難易度のCPUと戦う。"
           icon={<Cpu className="w-10 h-10" />}
           color="border-[#00ff41]/50 hover:bg-[#00ff41]/10 hover:border-[#00ff41]"
           onClick={() => {
@@ -168,7 +177,7 @@ export default function HomePage() {
 
         <MenuCard
           title="SETTINGS"
-          desc="戦績の確認、BGMの選択、プロフィールの編集。"
+          desc="戦績の確認、ランキング、プロフィールの編集。"
           icon={<Settings className="w-10 h-10" />}
           color="border-purple-500/50 hover:bg-purple-500/10 hover:border-purple-400"
           onClick={() => router.push("/settings")}
@@ -276,9 +285,14 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => {
-                router.push(
-                  `/battle?mode=${selectedConfig.mode}&lang=${selectedConfig.lang}&diff=${selectedConfig.diff}`,
-                );
+                setIsModalOpen(false);
+                if (selectedConfig.mode === "online") {
+                  handleOnlineBattleClick();
+                } else {
+                  router.push(
+                    `/battle?mode=${selectedConfig.mode}&lang=${selectedConfig.lang}&diff=${selectedConfig.diff}`,
+                  );
+                }
               }}
               className="w-full py-4 bg-[#00ff41] text-black hover:bg-green-400 transition-all rounded font-black tracking-widest shadow-[0_0_20px_rgba(0,255,65,0.4)] active:scale-95 uppercase"
             >
